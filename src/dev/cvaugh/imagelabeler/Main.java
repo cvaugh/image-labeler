@@ -15,6 +15,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -186,6 +187,14 @@ public class Main {
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
+        i = 0;
+        for(LabeledImage img : currentImages) {
+            float percent = ((float) i / (float) count) * 100.0f;
+            frame.setTitle(String.format("Image Labeler: Averaging colors: %.2f%%", percent));
+            img.calculateAverageColor();
+        }
+        frame.setTitle("Image Labeler: Sorting images...");
+        Collections.sort(currentImages);
         rightPanel.removeAll();
         i = 0;
         for(LabeledImage c : currentImages) {
