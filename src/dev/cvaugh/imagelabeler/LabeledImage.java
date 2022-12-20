@@ -11,12 +11,17 @@ import java.util.Comparator;
 import javax.imageio.ImageIO;
 
 public class LabeledImage implements Comparable<LabeledImage> {
-    public final BufferedImage image;
+    public BufferedImage image;
     public File file;
     public Label label = Label.NONE;
     public Color averageColor;
 
-    public LabeledImage(File file) throws IOException {
+    public LabeledImage(File file) {
+        this.file = file;
+        label = Labels.get(file.getAbsolutePath());
+    }
+
+    public void load() throws IOException {
         BufferedImage temp = ImageIO.read(file);
         int w = temp.getWidth() / Main.IMAGE_SCALE;
         int h = temp.getHeight() / Main.IMAGE_SCALE;
@@ -25,10 +30,8 @@ public class LabeledImage implements Comparable<LabeledImage> {
         Graphics2D g = image.createGraphics();
         g.drawImage(scaled, 0, 0, null);
         g.dispose();
-        this.file = file;
         temp = null;
         scaled = null;
-        label = Labels.get(file.getAbsolutePath());
     }
 
     public void label(Label c) {

@@ -20,6 +20,7 @@ import java.util.List;
 
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -29,6 +30,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.border.Border;
 
@@ -47,6 +49,8 @@ public class Main {
     private static int currentIndex = 0;
     private static int labelSize = 600;
     private static String currentPath = "";
+    private static Label showOnly = Label.NONE;
+    private static File currentRoot = null;
 
     public static void main(String[] args) {
         File startDirectory = new File(".");
@@ -104,6 +108,10 @@ public class Main {
                         JOptionPane.showMessageDialog(frame, "Failed to save labels", "Error",
                                 JOptionPane.ERROR_MESSAGE);
                         ex.printStackTrace();
+                    }
+                } else if(e.isControlDown() && e.getKeyCode() == KeyEvent.VK_R) {
+                    if(currentRoot != null) {
+                        openDir(currentRoot);
                     }
                 } else if(e.getKeyCode() == KeyEvent.VK_LEFT) {
                     setCurrent(currentIndex - 1);
@@ -192,6 +200,112 @@ public class Main {
             JOptionPane.showMessageDialog(frame, "No unlabeled images found");
         });
         toolsMenu.add(menuItem);
+        JMenu showOnlyMenu = new JMenu("Show only...");
+        showOnlyMenu.setMnemonic(KeyEvent.VK_O);
+        toolsMenu.add(showOnlyMenu);
+        ButtonGroup group = new ButtonGroup();
+        JRadioButtonMenuItem showOnlyFaces = new JRadioButtonMenuItem("Faces");
+        showOnlyFaces.setMnemonic(KeyEvent.VK_F);
+        showOnlyFaces.addActionListener(e -> {
+            showOnly = Label.FACE;
+        });
+        group.add(showOnlyFaces);
+        showOnlyMenu.add(showOnlyFaces);
+        JRadioButtonMenuItem showOnlyNonFaces = new JRadioButtonMenuItem("Non-Faces");
+        showOnlyNonFaces.setMnemonic(KeyEvent.VK_N);
+        showOnlyNonFaces.addActionListener(e -> {
+            showOnly = Label.NOT_FACE;
+        });
+        group.add(showOnlyNonFaces);
+        showOnlyMenu.add(showOnlyNonFaces);
+        JRadioButtonMenuItem showOnlyAmbiguous = new JRadioButtonMenuItem("Ambiguous");
+        showOnlyAmbiguous.setMnemonic(KeyEvent.VK_A);
+        showOnlyAmbiguous.addActionListener(e -> {
+            showOnly = Label.AMBIGUOUS;
+        });
+        group.add(showOnlyAmbiguous);
+        showOnlyMenu.add(showOnlyAmbiguous);
+        JRadioButtonMenuItem showOnlyUnlabeled = new JRadioButtonMenuItem("Unlabeled");
+        showOnlyUnlabeled.setMnemonic(KeyEvent.VK_U);
+        showOnlyUnlabeled.addActionListener(e -> {
+            showOnly = Label.NONE;
+        });
+        showOnlyUnlabeled.setSelected(true);
+        group.add(showOnlyUnlabeled);
+        showOnlyMenu.add(showOnlyUnlabeled);
+        JRadioButtonMenuItem showEverything = new JRadioButtonMenuItem("Everything");
+        showEverything.setMnemonic(KeyEvent.VK_E);
+        showEverything.addActionListener(e -> {
+            showOnly = null;
+        });
+        group.add(showEverything);
+        showOnlyMenu.add(showEverything);
+        menuItem = new JMenuItem("Reload");
+        menuItem.setMnemonic(KeyEvent.VK_R);
+        menuItem.addActionListener(e -> {
+            if(currentRoot != null) {
+                openDir(currentRoot);
+            }
+        });
+        toolsMenu.add(menuItem);
+        menuItem = new JMenuItem("Statistics");
+        menuItem.setMnemonic(KeyEvent.VK_S);
+        menuItem.addActionListener(e -> {
+            int faceCount = 0;
+            int nonFaceCount = 0;
+            int ambiguousCount = 0;
+            int unlabeledCount = 0;
+            for(String key : Labels.registry.keySet()) {
+                switch(Labels.registry.get(key)) {
+                case FACE:
+                    faceCount++;
+                    break;
+                case NOT_FACE:
+                    nonFaceCount++;
+                    break;
+                case AMBIGUOUS:
+                    ambiguousCount++;
+                    break;
+                default:
+                    unlabeledCount++;
+                    break;
+                }
+            }
+            JOptionPane.showMessageDialog(frame,
+                    String.format("Total images: %d\nFaces: %d\nNon-faces: %d\nAmbiguous: %d\nUnlabeled: %d",
+                            Labels.registry.size(), faceCount, nonFaceCount, ambiguousCount, unlabeledCount),
+                    "Statistics", JOptionPane.PLAIN_MESSAGE);
+        });
+        toolsMenu.add(menuItem);
+        menuItem = new JMenuItem("Statistics (loaded images only)");
+        menuItem.setMnemonic(KeyEvent.VK_L);
+        menuItem.addActionListener(e -> {
+            int faceCount = 0;
+            int nonFaceCount = 0;
+            int ambiguousCount = 0;
+            int unlabeledCount = 0;
+            for(LabeledImage image : currentImages) {
+                switch(image.label) {
+                case FACE:
+                    faceCount++;
+                    break;
+                case NOT_FACE:
+                    nonFaceCount++;
+                    break;
+                case AMBIGUOUS:
+                    ambiguousCount++;
+                    break;
+                default:
+                    unlabeledCount++;
+                    break;
+                }
+            }
+            JOptionPane.showMessageDialog(frame,
+                    String.format("Total images: %d\nFaces: %d\nNon-faces: %d\nAmbiguous: %d\nUnlabeled: %d",
+                            currentImages.size(), faceCount, nonFaceCount, ambiguousCount, unlabeledCount),
+                    "Statistics (loaded images only)", JOptionPane.PLAIN_MESSAGE);
+        });
+        toolsMenu.add(menuItem);
         menuBar.add(toolsMenu);
         JMenu settingsMenu = new JMenu("Settings");
         settingsMenu.setMnemonic(KeyEvent.VK_S);
@@ -219,13 +333,18 @@ public class Main {
         int r = FILE_CHOOSER.showOpenDialog(frame);
         if(r == JFileChooser.APPROVE_OPTION) {
             File dir = FILE_CHOOSER.getSelectedFile();
-            frame.setTitle("Image Labeler: Searching for images...");
-            List<File> files = traverse(dir);
-            frame.setTitle("Image Labeler: Loading images...");
-            updateImages(files);
-            currentPath = dir.getAbsolutePath();
-            updateTitle();
+            openDir(dir);
         }
+    }
+
+    private static void openDir(File dir) {
+        currentRoot = dir;
+        frame.setTitle("Image Labeler: Searching for images...");
+        List<File> files = traverse(dir);
+        frame.setTitle("Image Labeler: Loading images...");
+        updateImages(files);
+        currentPath = dir.getAbsolutePath();
+        updateTitle();
     }
 
     private static List<File> traverse(File dir) {
@@ -247,8 +366,12 @@ public class Main {
         for(File file : files) {
             float percent = ((float) i / (float) count) * 100.0f;
             frame.setTitle(String.format("Image Labeler: Loading images: %.2f%%", percent));
+            LabeledImage image = new LabeledImage(file);
             try {
-                currentImages.add(new LabeledImage(file));
+                if(showOnly == null || image.label == showOnly) {
+                    image.load();
+                    currentImages.add(image);
+                }
             } catch(IOException e) {
                 e.printStackTrace();
             }
