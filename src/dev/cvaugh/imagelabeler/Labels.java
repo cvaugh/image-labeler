@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 
 public final class Labels {
-    private static File file = new File("labels.tsv");
+    static File file = new File("labels.tsv");
     private static HashMap<String, Label> registry = new HashMap<>();
 
     public static Label get(String path) {

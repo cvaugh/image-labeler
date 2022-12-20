@@ -13,7 +13,7 @@ import javax.imageio.ImageIO;
 public class LabeledImage implements Comparable<LabeledImage> {
     public final BufferedImage image;
     public File file;
-    public Label label;
+    public Label label = Label.NONE;
     public Color averageColor;
 
     public LabeledImage(File file) throws IOException {

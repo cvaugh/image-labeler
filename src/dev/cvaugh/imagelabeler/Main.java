@@ -18,11 +18,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -71,6 +75,7 @@ public class Main {
             System.exit(1);
         }
         frame.getContentPane().setLayout(new GridLayout(1, 2));
+        initMenuBar();
         initComponents();
         frame.setTitle("Image Labeler");
         frame.setResizable(false);
@@ -90,12 +95,14 @@ public class Main {
         frame.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                if(e.getKeyCode() == KeyEvent.VK_O) {
+                if(e.isControlDown() && e.getKeyCode() == KeyEvent.VK_O) {
                     openDir();
-                } else if(e.getKeyCode() == KeyEvent.VK_S) {
+                } else if(e.isControlDown() && e.getKeyCode() == KeyEvent.VK_S) {
                     try {
                         Labels.save();
                     } catch(IOException ex) {
+                        JOptionPane.showMessageDialog(frame, "Failed to save labels", "Error",
+                                JOptionPane.ERROR_MESSAGE);
                         ex.printStackTrace();
                     }
                 } else if(e.getKeyCode() == KeyEvent.VK_LEFT) {
@@ -126,6 +133,71 @@ public class Main {
         frame.pack();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+    }
+
+    private static void initMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        JMenu fileMenu = new JMenu("File");
+        fileMenu.setMnemonic(KeyEvent.VK_F);
+        JMenuItem menuItem = new JMenuItem("Open");
+        menuItem.setMnemonic(KeyEvent.VK_O);
+        menuItem.addActionListener(e -> {
+            openDir();
+        });
+        fileMenu.add(menuItem);
+        menuItem = new JMenuItem("Save");
+        menuItem.setMnemonic(KeyEvent.VK_S);
+        menuItem.addActionListener(e -> {
+            try {
+                Labels.save();
+            } catch(IOException ex) {
+                JOptionPane.showMessageDialog(frame, "Failed to save labels", "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+                return;
+            }
+        });
+        fileMenu.add(menuItem);
+        fileMenu.addSeparator();
+        menuItem = new JMenuItem("Exit");
+        menuItem.setMnemonic(KeyEvent.VK_X);
+        menuItem.addActionListener(e -> {
+            int r = JOptionPane.showConfirmDialog(frame, "Save before exiting?", "Confirm Exit",
+                    JOptionPane.YES_NO_CANCEL_OPTION);
+            if(r == JOptionPane.CANCEL_OPTION) {
+                return;
+            } else if(r == JOptionPane.YES_OPTION) {
+                try {
+                    Labels.save();
+                } catch(IOException ex) {
+                    JOptionPane.showMessageDialog(frame, "Failed to save labels", "Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
+                    return;
+                }
+            }
+            System.exit(0);
+        });
+        fileMenu.add(menuItem);
+        menuBar.add(fileMenu);
+        JMenu toolsMenu = new JMenu("Tools");
+        toolsMenu.setMnemonic(KeyEvent.VK_T);
+        menuItem = new JMenuItem("Skip to first unlabeled");
+        menuItem.setMnemonic(KeyEvent.VK_U);
+        menuItem.addActionListener(e -> {
+            for(int i = 0; i < currentImages.size(); i++) {
+                if(currentImages.get(i).label == Label.NONE) {
+                    setCurrent(i);
+                    return;
+                }
+            }
+            JOptionPane.showMessageDialog(frame, "No unlabeled images found");
+        });
+        toolsMenu.add(menuItem);
+        menuBar.add(toolsMenu);
+        JMenu settingsMenu = new JMenu("Settings");
+        settingsMenu.setMnemonic(KeyEvent.VK_S);
+        // TODO settings menu
+        menuBar.add(settingsMenu);
+        frame.setJMenuBar(menuBar);
     }
 
     private static void initComponents() {
@@ -192,6 +264,7 @@ public class Main {
             float percent = ((float) i / (float) count) * 100.0f;
             frame.setTitle(String.format("Image Labeler: Averaging colors: %.2f%%", percent));
             img.calculateAverageColor();
+            i++;
         }
         frame.setTitle("Image Labeler: Sorting images...");
         Collections.sort(currentImages);
@@ -249,18 +322,23 @@ public class Main {
         }
         if(index >= currentImages.size()) {
             currentIndex = currentImages.size();
-            JOptionPane.showMessageDialog(frame, "End of current image set reached. Press O to open a new set.",
+            JOptionPane.showMessageDialog(frame, "End of current image set reached. Press Ctrl+O to open a new set.",
                     "Notice", JOptionPane.WARNING_MESSAGE);
             updateTitle();
             return;
         }
         current = currentImages.get(index);
-        int w = (int) (((float) labelSize / (float) current.image.getHeight()) * (float) current.image.getWidth());
-        Image scaled = current.image.getScaledInstance(w, labelSize, Image.SCALE_FAST);
-        BufferedImage temp = new BufferedImage(w, labelSize, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = temp.createGraphics();
-        g.drawImage(scaled, 0, 0, null);
-        g.dispose();
+        BufferedImage temp = null;
+        try {
+            temp = ImageIO.read(current.file);
+        } catch(IOException e) {
+            int w = (int) (((float) labelSize / (float) current.image.getHeight()) * (float) current.image.getWidth());
+            Image scaled = current.image.getScaledInstance(w, labelSize, Image.SCALE_FAST);
+            temp = new BufferedImage(w, labelSize, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = temp.createGraphics();
+            g.drawImage(scaled, 0, 0, null);
+            g.dispose();
+        }
         currentLabel.setIcon(new ImageIcon(temp));
         updateTitle();
     }
